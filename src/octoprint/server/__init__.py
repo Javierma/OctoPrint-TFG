@@ -972,6 +972,7 @@ class Server(object):
 			"js/app/client/logs.js",
 			"js/app/client/printer.js",
 			"js/app/client/printerprofiles.js",
+			"js/app/client/schedule.js",
 			"js/app/client/settings.js",
 			"js/app/client/slicing.js",
 			"js/app/client/system.js",

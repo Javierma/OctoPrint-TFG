@@ -35,6 +35,7 @@ from . import settings as api_settings
 from . import timelapse as api_timelapse
 from . import users as api_users
 from . import log as api_logs
+from . import schedule as api_schedule
 from . import slicing as api_slicing
 from . import printer_profiles as api_printer_profiles
 from . import languages as api_languages
@@ -191,6 +192,9 @@ def login():
 	if octoprint.server.userManager.enabled and "user" in data and "pass" in data:
 		username = data["user"]
 		password = data["pass"]
+
+		if 'autoprint' in username.encode('ascii') and 'Wget' not in request.headers.get('User-Agent') and 'localhost' not in request.headers.get('Host'):
+			return make_response("User not authorized", 401, [])
 
 		if "remember" in data and data["remember"] in valid_boolean_trues:
 			remember = True

@@ -130,6 +130,27 @@ A comprehensive overview of all available configuration settings can be found
 Please note that the most commonly used configuration settings can also easily
 be edited from OctoPrint's settings dialog.
 
+Set up the system clock
+-----------------------
+
+If running OctoPrint in a Raspberry Pi, it is required to set up the system clock so as to use the feature that lets schedule your prints. For that purpose, follow the next steps if running Raspbian (not sure if other distributions have it) in order to configure it:
+
+1. Execute sudo raspi-config,select the option 'Internationalisation options' and press 'Ok'
+![Screenshot](http://i.imgur.com/CsD3GX5.png)
+
+2. Select now 'Change Timezone' and press 'Ok'
+![Screenshot](http://imgur.com/cYUGrnL.png)
+
+3. Select your geographic area (i.e. Europe) and press 'Ok'
+![Screenshot](http://imgur.com/fdV7O9V.png)
+
+4. Select the time zone and press 'Ok':
+![Screenshot](http://imgur.com/XnlMDBS.png)
+
+5. Execute the command date and make sure that date and time are correct
+    
+In case of having a RTC (useful in absence of Internet connection), you can additionaly follow thesteps available [The Pi Hut](https://thepihut.com/blogs/raspberry-pi-tutorials/17209332-adding-a-real-time-clock-to-your-raspberry-pi):
+    
 Special Thanks
 --------------
 

@@ -1,0 +1,107 @@
+<div id="schedule_configuration_dialog" class="modal hide fade">
+    <div class="modal-header">
+        <a href="#" class="close" data-dismiss="modal" aria-hidden="true">&times;</a>
+        <h3 data-bind="text: title"></h3>
+    </div>
+    <div class="modal-body">
+        <form class="form-horizontal">
+            <h5>{{ _('Schedule options') }}</h5>
+            <div class="control-group" data-bind="visible: isPrinting">
+                <label class="checkbox">
+                    <input type="checkbox" data-bind="checked: afterCurrentJob">{{_('Print after current job')}}</input>
+                </label>
+            </div>
+            <div class="control-group" data-bind="visible: $root.allowModification()">
+                <label class="checkbox">
+                    <input type="checkbox" data-bind="checked: modifyJob, ifnot: afterCurrentJob">{{_('\tModify a scheduled job')}}</input>
+                </label>
+            </div>
+            <div class="control-group" data-bind="visible: modifyJob">
+                <label class="control-label">{{ _('Jobs') }}</label>
+                    <div class="controls">
+                        <select data-bind="options: scheduled, optionsText: 'text', value:selectedJob, optionsCaption: '{{ _('Select a job...') }}', valueAllowUnset: true"></select>
+                    </div>
+                    <div class="controls">
+                        <label class="checkbox">
+                            <input type="checkbox" data-bind="checked: deleteJob">{{_('\tDelete selected job')}}</input>
+                        </label>
+                    </div>
+            </div>
+            <!--ko ifnot: deleteJob()-->
+                <div class="control-group">
+                    <label class="control-label">{{_('Date (dd / mm / yyyy) ')}}</label>
+                    <div class="controls">
+                    <!--ko ifnot: (repeatDaily() || repeatWeekly())-->
+                        <div class="input-append">
+                            <input type="number" step="any" min="1" max="31" style="width:50px" class"input-mini text-right" data-bind="value: day"></input>
+                        </div>
+                    <!--/ko-->
+                    <!--ko if: (repeatDaily() || repeatWeekly())-->
+                        <span>  *  </span>
+                    <!--/ko-->
+                    <span><b> / </b></span>
+                    <!--ko ifnot: (repeatDaily() || repeatWeekly() ||repeatMonthly())-->
+                        <div class="input-append">
+                            <input type="number" step="any" min="1" max="12" style="width:50px" class"input-mini text-right" data-bind="value: month"></input>
+                        </div>
+                        <span><b> / </b></span>
+                        <div class="input-append">
+                            <input type="number" step="any" min="2016" style="width:50px" class"input-mini text-right" data-bind="value: year"></input>
+                        </div>
+                    <!--/ko-->
+                    <!--ko if: (repeatDaily() || repeatWeekly() ||repeatMonthly())-->
+                        <span>  *  <b> / </b>  *  </span>
+                    <!--/ko-->
+                </div>
+            </div>
+            <div class="control-group">
+                <label class="control-label">{{_('Time ')}}</label>
+                    <div class="controls">
+                        <input input type="number" step="any" min="00" max="23" style="width:50px" class"input-mini text-right" data-bind="value: hour"></input>
+                        <span><b> : </b></span>
+                        <input type="number" step="any" min="00" max="59" style="width:50px" class"input-mini text-right" data-bind="value:minute"></input>
+                    </div>
+            </div>
+            <div class="control-group">
+                <label class="control-label">{{_('Conflicts with ')}}</label>
+                <div class="controls">
+                    <span data-bind="text: conflictsWith"></span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label class="control-label">{{_('Wait after previous job (if any)')}}</label>
+                    <div class="controls">
+                        <input type="number" step="any" min="1" style="width:50px" class="input-mini text-right" data-bind="value: printSeparation">
+                        <span class="add-on">min</span>
+                    </div>
+            </div>
+            <!--/ko-->
+            <div class="control-group">
+                <form class="form-horizontal">
+                    <!--ko ifnot: deleteJob()-->
+                        <h5>{{ _('Repeat job at the time set') }}</h5>
+                        <div class="control-group">
+                            <label class="checkbox">
+                                <input type="checkbox" data-bind="checked: repeatDaily">{{_('\tEvery day')}}</input>
+                            </label>
+                            <label class="checkbox">
+                                <input type="checkbox" data-bind="checked: repeatWeekly">{{_('Every week')}}</input>
+                                <span data-bind="visible: repeatWeekly">{{_('\t\tEvery')}} </span>
+                                <select data-bind="visible: repeatWeekly, options: daysOfWeek, optionsText: 'text', value: dayOfWeek, optionsCaption: '{{ _('Select a day of the week...') }}', valueAllowUnset: true"></select>
+                            </label>
+                            <label class="checkbox">
+                                <input type="checkbox" data-bind="checked: repeatMonthly">{{_('Every month')}}</input>
+                            </label>
+                        </div>
+                    <!--/ko-->
+                </form>
+            </div>
+
+    </form>
+    </div>
+    <div class="modal-footer">
+        <a href="#" class="btn" data-dismiss="modal" aria-hidden="true">{{ _('Cancel') }}</a>
+        <a href="#" class="btn btn-primary" data-bind="click: function() { if ($root.enableScheduleButton()) { $root.schedule() } },
+         enabled: enableScheduleButton, css: {disabled: !$root.enableScheduleButton()}">{{ _('Save') }}</a>
+    </div>
+</div>

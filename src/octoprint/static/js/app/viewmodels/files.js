@@ -1,12 +1,14 @@
 $(function() {
     function GcodeFilesViewModel(parameters) {
         var self = this;
+        var askUser = false;
 
         self.settingsViewModel = parameters[0];
         self.loginState = parameters[1];
         self.printerState = parameters[2];
         self.slicing = parameters[3];
         self.printerProfiles=parameters[4];
+        self.schedule=parameters[5];
 
         self.isErrorOrClosed = ko.observable(undefined);
         self.isOperational = ko.observable(undefined);
@@ -287,13 +289,77 @@ $(function() {
             if (!file) {
                 return;
             }
-            OctoPrint.files.select(file.origin, OctoPrint.files.pathForElement(file))
-                .done(function() {
-                    var withinPrintDimensions = self.evaluatePrintDimensions(file, true);
-                    if (withinPrintDimensions && printAfterLoad) {
-                        OctoPrint.job.start();
+
+            if (printAfterLoad) {
+            // Check if a job is going to start during the printing
+            OctoPrint.schedule.listAllScheduledJobs()
+                .done(function(data) {
+                    if (Object.keys(data).length > 0) {
+                        _.each(_.values(data), function(jobs) {
+                            var hour = Number(jobs.jobStart["hour"]);
+                            var minute = Number(jobs.jobStart["minute"]);
+                            var month = jobs.jobStart["month"];
+                            var day = jobs.jobStart["day_of_month"];
+                            var dayOfWeek = jobs.jobStart["day_of_week"];
+                            var text = undefined;
+                            var currentDate = new Date();
+                            var jobStart = undefined;
+                            var currentJobTime = undefined;
+
+                            if (file["prints"]["last"]["printTime"]) {
+                                currentJobTime = file["prints"]["last"]["printTime"] * 1000;
+                            } else {
+                                currentJobTime = (file["gcodeAnalysis"]["estimatedPrintTime"]) * 1000;
+                            }
+
+                            var currentJobEnd = currentDate.getTime() + currentJobTime;
+                            if (month === '*' && day === '*' && dayOfWeek === '*') {
+                                jobStart = new Date(currentDate.getFullYear(),currentDate.getMonth(),currentDate.getDate(), hour, minute).getTime();
+                            } else if (month === '*' && day != '*' && dayOfWeek === '*') {
+                                jobStart = new Date(currentDate.getFullYear(),currentDate.getMonth(), day, hour, minute).getTime();
+                            } else if (month === '*' && day === '*' && dayOfWeek != '*') {
+                                jobStart = new Date(currentDate.getFullYear(),currentDate.getMonth(),day, hour, minute).getTime();
+                            } else {
+                                jobStart = new Date(currentDate.getFullYear(), month - 1, day, hour, minute).getTime();
+                            }
+                            if (jobStart <= currentJobEnd) {
+                                askUser = true;
+                            }
+                        });
+                    }
+                    if (askUser) {
+                        askUser = false;
+                        $("#print_warning_dialog").modal("show");
+                        $("#print_warning_dialog .confirmation_dialog_acknowledge").unbind("click");
+                        $("#print_warning_dialog .confirmation_dialog_acknowledge").click(function() {
+                            OctoPrint.files.select(file.origin, OctoPrint.files.pathForElement(file))
+                                .done(function() {
+                                    var withinPrintDimensions = self.evaluatePrintDimensions(file, true);
+                                    if (withinPrintDimensions && printAfterLoad) {
+                                        OctoPrint.job.start();
+                                    }
+                                });
+                            $("#print_warning_dialog").modal("hide");
+                        });
+                    } else {
+                        OctoPrint.files.select(file.origin, OctoPrint.files.pathForElement(file))
+                          .done(function() {
+                               var withinPrintDimensions = self.evaluatePrintDimensions(file, true);
+                               if (withinPrintDimensions && printAfterLoad) {
+                                   OctoPrint.job.start();
+                               }
+                         });
                     }
                 });
+            } else {
+                OctoPrint.files.select(file.origin, OctoPrint.files.pathForElement(file))
+                   .done(function() {
+                       var withinPrintDimensions = self.evaluatePrintDimensions(file, true);
+                       if (withinPrintDimensions && printAfterLoad) {
+                           OctoPrint.job.start();
+                       }
+                    });
+            }
         };
 
         self.removeFile = function(file) {
@@ -794,12 +860,26 @@ $(function() {
                 if (dropZoneSd) dropZoneSdBackground.removeClass("hover");
                 if (dropZone) dropZoneBackground.removeClass("hover");
             }, 100);
+        };
+
+        // Functions related with schedule printing
+        self.enableSchedule = function() {
+            return self.loginState.isUser();
+        };
+
+        self.scheduler = function(file) {
+            if (file["prints"] && file["prints"]["last"]["lastPrintTime"]) {
+                self.schedule.show(file.origin, OctoPrint.files.pathForElement(file),file,file["prints"]["last"]["lastPrintTime"]);
+            }
+            else {
+                self.schedule.show(file.origin, OctoPrint.files.pathForElement(file),file,file["gcodeAnalysis"]["estimatedPrintTime"]);
+            }
         }
     }
 
     OCTOPRINT_VIEWMODELS.push([
         GcodeFilesViewModel,
-        ["settingsViewModel", "loginStateViewModel", "printerStateViewModel", "slicingViewModel","printerProfilesViewModel"],
-        ["#files_wrapper", "#add_folder_dialog"]
+        ["settingsViewModel","loginStateViewModel", "printerStateViewModel", "slicingViewModel","printerProfilesViewModel","scheduleViewModel"],
+        ["#files_wrapper", "#add_folder_dialog", "#print_warning_dialog"]
     ]);
 });

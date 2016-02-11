@@ -41,6 +41,8 @@ $(function() {
 
         self.currentHeight = ko.observable(undefined);
 
+        var askUser = false;
+
         self.TITLE_PRINT_BUTTON_PAUSED = gettext("Restarts the print job from the beginning");
         self.TITLE_PRINT_BUTTON_UNPAUSED = gettext("Starts the print job");
         self.TITLE_PAUSE_BUTTON_PAUSED = gettext("Resumes the print job");
@@ -208,16 +210,62 @@ $(function() {
         };
 
         self.print = function() {
-            if (self.isPaused()) {
-                showConfirmationDialog({
-                    message: gettext("This will restart the print job from the beginning."),
-                    onproceed: function() {
-                        OctoPrint.job.restart();
-                    }
+            // Check if printing at this moment will present a conflict with a scheduled job
+            OctoPrint.schedule.listAllScheduledJobs()
+                .done(function(data) {
+                     if (Object.keys(data).length > 0) {
+                         _.each(_.values(data), function(jobs) {
+                             var hour = Number(jobs.jobStart["hour"]);
+                             var minute = Number(jobs.jobStart["minute"]);
+                             var month = jobs.jobStart["month"];
+                             var day = jobs.jobStart["day_of_month"];
+                             var dayOfWeek = jobs.jobStart["day_of_week"];
+                             var text = undefined;
+                             var currentDate = new Date();
+                             var jobStart = undefined;
+                             var currentJobTime = undefined;
+                             if (self.lastPrintTime() != undefined) {
+                                 currentJobTime = self.lastPrintTime() * 1000;
+                             }
+                             else {
+                                 currentJobTime = self.estimatedPrintTime() * 1000;
+                             }
+                             var currentJobEnd = currentDate.getTime() + currentJobTime;
+                             if (month === '*' && day === '*' && dayOfWeek === '*') {
+                                 jobStart = new Date(currentDate.getFullYear(),currentDate.getMonth(),currentDate.getDate(), hour, minute).getTime();
+                             } else if (month === '*' && day != '*' && dayOfWeek === '*') {
+                                 jobStart = new Date(currentDate.getFullYear(),currentDate.getMonth(), day, hour, minute).getTime();
+                             } else if (month === '*' && day === '*' && dayOfWeek != '*') {
+                                 jobStart = new Date(currentDate.getFullYear(),currentDate.getMonth(),day, hour, minute).getTime();
+                             } else {
+                                 jobStart = new Date(currentDate.getFullYear(), month - 1, day, hour, minute).getTime();
+                             }
+                             if (jobStart <= currentJobEnd) {
+                                 askUser = true;
+                             }
+                         });
+                     }
+                     if (askUser) {
+                         askUser = false;
+                         $("#print_warning_dialog").modal("show");
+                         $("#print_warning_dialog .confirmation_dialog_acknowledge").unbind("click");
+                         $("#print_warning_dialog .confirmation_dialog_acknowledge").click(function() {
+                             OctoPrint.job.start();
+                             $("#print_warning_dialog").modal("hide");
+                         });
+                     } else {
+                         if (self.isPaused()) {
+                             showConfirmationDialog({
+                                 message: gettext("This will restart the print job from the beginning."),
+                                 onproceed: function() {
+                                     OctoPrint.job.restart();
+                                 }
+                             });
+                         } else {
+                             OctoPrint.job.start();
+                         }
+                     }
                 });
-            } else {
-                OctoPrint.job.start();
-            }
         };
 
         self.pause = function() {

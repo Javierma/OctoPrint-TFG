@@ -907,6 +907,7 @@ def collect_plugin_assets(enable_gcodeviewer=True, preferred_stylesheet="css"):
 		'js/app/viewmodels/navigation.js',
 		'js/app/viewmodels/printerstate.js',
 		'js/app/viewmodels/printerprofiles.js',
+		'js/app/viewmodels/schedule.js',
 		'js/app/viewmodels/settings.js',
 		'js/app/viewmodels/slicing.js',
 		'js/app/viewmodels/system.js',
