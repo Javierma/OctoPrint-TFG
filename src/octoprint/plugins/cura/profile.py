@@ -31,6 +31,11 @@ class MachineShapeTypes(object):
 	SQUARE = "square"
 	CIRCULAR = "circular"
 
+class RetractionCombingTypes(object):
+	OFF = "off"
+	ALL = "all"
+	NO_SKIN = "no skin"
+
 class GcodeFlavors(object):
 	REPRAP = (0, "reprap")
 	ULTIGCODE = (1, "ultigcode")
@@ -45,7 +50,7 @@ defaults = dict(
     wall_thickness=0.8,
     solid_layer_thickness=0.6,
     print_temperature=[220, 0, 0, 0],
-    print_bed_temperature=70,
+    print_bed_temperature=0,
     platform_adhesion=PlatformAdhesionTypes.NONE,
     filament_diameter=[2.85, 0, 0, 0],
     filament_flow=100.0,
@@ -390,6 +395,11 @@ class Profile(object):
 				"Both": SupportDualTypes.BOTH,
 				"First extruder": SupportDualTypes.FIRST,
 				"Second extruder": SupportDualTypes.SECOND
+			},
+			retraction_combing={
+				"Off": RetractionCombingTypes.OFF,
+				"All": RetractionCombingTypes.ALL,
+				"No Skin": RetractionCombingTypes.NO_SKIN
 			}
 		)
 
@@ -449,13 +459,16 @@ class Profile(object):
 				index = None
 
 				for opt in arrayified_options:
-					if key.startswith(opt):
+					# if there's a period, the index comes before it
+					optsplit = opt.split('.')
+					keysplit = key.split('.')
+					if key.startswith(optsplit[0]) and keysplit[1:] == optsplit[1:]:
 						if key == opt:
 							index = 0
 						else:
 							try:
 								# try to convert the target index, e.g. print_temperature2 => print_temperature[1]
-								index = int(key[len(opt):]) - 1
+								index = int(keysplit[0][len(optsplit[0]):]) - 1
 							except ValueError:
 								# ignore entries for which that fails
 								ignored = True
@@ -911,7 +924,7 @@ class Profile(object):
 			"retractionAmountExtruderSwitch": self.get_microns("retraction_dual_amount"),
 			"retractionZHop": self.get_microns("retraction_hop"),
 			"minimalExtrusionBeforeRetraction": self.get_microns("retraction_minimal_extrusion"),
-			"enableCombing": 1 if self.get_boolean("retraction_combing") else 0,
+			"enableCombing": 1 if self.get("retraction_combing") == RetractionCombingTypes.ALL else (2 if self.get("retraction_combing") == RetractionCombingTypes.NO_SKIN else 0),
 			"multiVolumeOverlap": self.get_microns("overlap_dual"),
 			"objectSink": max(0, self.get_microns("object_sink")),
 			"minimalLayerTime": self.get_int("cool_min_layer_time"),

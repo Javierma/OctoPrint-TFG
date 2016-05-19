@@ -35,8 +35,9 @@ INSTALL_REQUIRES = [
 	"requests>=2.7,<2.8",
 	"semantic_version>=2.4.2,<2.5",
 	"psutil>=3.2.1,<3.3",
-	"Click>=5.1,<5.2",
-	"awesome-slugify>=1.6.5,<1.7"
+	"Click>=6.2,<6.3",
+	"awesome-slugify>=1.6.5,<1.7",
+	"feedparser>=5.2.1,<5.3"
 ]
 
 # Additional requirements for optional install options
@@ -59,7 +60,7 @@ EXTRA_REQUIRES = dict(
 
 	# Dependencies for developing OctoPrint plugins
 	plugins=[
-		"cookiecutter"
+		"cookiecutter>=1.4,<1.5"
 	]
 )
 
@@ -114,6 +115,7 @@ def get_cmdclass():
 		"octoprint/templates/_data": [
 			"AUTHORS.md",
 			"CHANGELOG.md",
+			"SUPPORTERS.md",
 			"THIRDPARTYLICENSES.md",
 		]
 	}, cmdclass["build_py"] if "build_py" in cmdclass else _build_py)

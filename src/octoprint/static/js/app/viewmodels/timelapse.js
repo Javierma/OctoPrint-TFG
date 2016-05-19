@@ -7,11 +7,13 @@ $(function() {
         self.defaultFps = 25;
         self.defaultPostRoll = 0;
         self.defaultInterval = 10;
+        self.defaultRetractionZHop = 0;
 
         self.timelapseType = ko.observable(undefined);
         self.timelapseTimedInterval = ko.observable(self.defaultInterval);
         self.timelapsePostRoll = ko.observable(self.defaultPostRoll);
         self.timelapseFps = ko.observable(self.defaultFps);
+        self.timelapseRetractionZHop = ko.observable(self.defaultRetractionZHop);
 
         self.persist = ko.observable(false);
         self.isDirty = ko.observable(false);
@@ -24,13 +26,17 @@ $(function() {
         self.isReady = ko.observable(undefined);
         self.isLoading = ko.observable(undefined);
 
-        self.timelapseTypeSelected = ko.computed(function() {
+        self.isBusy = ko.pureComputed(function() {
+            return self.isPrinting() || self.isPaused();
+        });
+
+        self.timelapseTypeSelected = ko.pureComputed(function() {
             return ("off" != self.timelapseType());
         });
-        self.intervalInputEnabled = ko.computed(function() {
+        self.intervalInputEnabled = ko.pureComputed(function() {
             return ("timed" == self.timelapseType());
         });
-        self.saveButtonEnabled = ko.computed(function() {
+        self.saveButtonEnabled = ko.pureComputed(function() {
             return self.isDirty() && self.isOperational() && !self.isPrinting() && self.loginState.isUser();
         });
 
@@ -48,6 +54,9 @@ $(function() {
             self.isDirty(true);
         });
         self.timelapseFps.subscribe(function() {
+            self.isDirty(true);
+        });
+        self.timelapseRetractionZHop.subscribe(function(newValue) {
             self.isDirty(true);
         });
 
@@ -82,8 +91,39 @@ $(function() {
             CONFIG_TIMELAPSEFILESPERPAGE
         );
 
+        // initialize list helper for unrendered timelapses
+        self.unrenderedListHelper = new ItemListHelper(
+            "unrenderedTimelapseFiles",
+            {
+                "name": function(a, b) {
+                    // sorts ascending
+                    if (a["name"].toLocaleLowerCase() < b["name"].toLocaleLowerCase()) return -1;
+                    if (a["name"].toLocaleLowerCase() > b["name"].toLocaleLowerCase()) return 1;
+                    return 0;
+                },
+                "creation": function(a, b) {
+                    // sorts descending
+                    if (a["date"] > b["date"]) return -1;
+                    if (a["date"] < b["date"]) return 1;
+                    return 0;
+                },
+                "size": function(a, b) {
+                    // sorts descending
+                    if (a["bytes"] > b["bytes"]) return -1;
+                    if (a["bytes"] < b["bytes"]) return 1;
+                    return 0;
+                }
+            },
+            {
+            },
+            "name",
+            [],
+            [],
+            CONFIG_TIMELAPSEFILESPERPAGE
+        );
+
         self.requestData = function() {
-            OctoPrint.timelapse.get()
+            OctoPrint.timelapse.get({ data: { unrendered: true} })
                 .done(self.fromResponse);
         };
 
@@ -93,6 +133,9 @@ $(function() {
 
             self.timelapseType(config.type);
             self.listHelper.updateItems(response.files);
+            if (response.unrendered) {
+                self.unrenderedListHelper.updateItems(response.unrendered);
+            }
 
             if (config.type == "timed") {
                 if (config.interval != undefined && config.interval > 0) {
@@ -100,6 +143,14 @@ $(function() {
                 }
             } else {
                 self.timelapseTimedInterval(self.defaultInterval);
+            }
+
+            if (config.type == "zchange") {
+                if (config.retractionZHop != undefined && config.retractionZHop > 0) {
+                    self.timelapseRetractionZHop(config.retractionZHop);
+                }
+            } else {
+                self.timelapseRetractionZHop(self.defaultRetractionZHop);
             }
 
             if (config.postRoll != undefined && config.postRoll >= 0) {
@@ -141,6 +192,16 @@ $(function() {
                 .done(self.requestData);
         };
 
+        self.removeUnrendered = function(name) {
+            OctoPrint.timelapse.deleteUnrendered(name)
+                .done(self.requestData);
+        };
+
+        self.renderUnrendered = function(name) {
+            OctoPrint.timelapse.renderUnrendered(name)
+                .done(self.requestData);
+        };
+
         self.save = function() {
             var payload = {
                 "type": self.timelapseType(),
@@ -151,6 +212,10 @@ $(function() {
 
             if (self.timelapseType() == "timed") {
                 payload["interval"] = self.timelapseTimedInterval();
+            }
+
+            if (self.timelapseType() == "zchange") {
+                payload["retractionZHop"] = self.timelapseRetractionZHop();
             }
 
             OctoPrint.timelapse.saveConfig(payload)

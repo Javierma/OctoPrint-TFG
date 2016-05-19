@@ -7,7 +7,7 @@ $(function() {
 
         self.ui_progress_percentage = ko.observable();
         self.ui_progress_type = ko.observable();
-        self.ui_progress_text = ko.computed(function() {
+        self.ui_progress_text = ko.pureComputed(function() {
             var text = "";
             switch (self.ui_progress_type()) {
                 case "loading": {
@@ -52,6 +52,8 @@ $(function() {
 
         self.reader_sortLayers = ko.observable(true);
         self.reader_hideEmptyLayers = ko.observable(true);
+
+        self.layerSelectionEnabled = ko.observable(false)
 
         self.synchronizeOptions = function(additionalRendererOptions, additionalReaderOptions) {
             var renderer = {
@@ -419,11 +421,13 @@ $(function() {
                     self.layerSlider.slider("disable");
                     self.layerSlider.slider("setMax", 1);
                     self.layerSlider.slider("setValue", 0);
+                    self.layerSelectionEnabled(false);
                 }
                 self.currentLayer = 0;
             } else {
                 var output = [];
                 output.push(gettext("Model size") + ": " + model.width.toFixed(2) + "mm &times; " + model.depth.toFixed(2) + "mm &times; " + model.height.toFixed(2) + "mm");
+                output.push(gettext("Estimated total print time") + ": " + formatDuration(model.printTime));
                 output.push(gettext("Estimated layer height") + ": " + model.layerHeight.toFixed(2) + gettext("mm"));
                 output.push(gettext("Layer count") + ": " + model.layersPrinted.toFixed(0) + " " + gettext("printed") + ", " + model.layersTotal.toFixed(0) + " " + gettext("visited"));
 
@@ -433,6 +437,7 @@ $(function() {
                     self.layerSlider.slider("enable");
                     self.layerSlider.slider("setMax", model.layersPrinted - 1);
                     self.layerSlider.slider("setValue", 0);
+                    self.layerSelectionEnabled(true);
                 }
             }
         };
@@ -496,6 +501,36 @@ $(function() {
             GCODE.ui.changeSelectedLayer(value);
         };
 
+        self.onMouseOver = function(data, event) {
+            if (!self.settings.feature_keyboardControl() || self.layerSlider != undefined) return;
+            $("#canvas_container").focus();
+
+        };
+        self.onMouseOut = function(data, event) {
+            if (!self.settings.feature_keyboardControl() || self.layerSlider != undefined) return;
+            $("#canvas_container").blur();
+        };
+        self.onKeyDown = function(data, event) {
+            if (!self.settings.feature_keyboardControl() || self.layerSlider != undefined) return;
+
+            var value = self.currentLayer;
+            switch(event.which){
+                case 33: // Pg up
+                    value = value + 10; // No need to check against max this is done by the Slider anyway
+                    break;
+                case 34: // Pg down
+                    value = value - 10; // No need to check against min, this is done by the Slider anyway
+                    break;
+                case 38: // up arrow key
+                    value = value + 1; // No need to check against max this is done by the Slider anyway
+                    break;
+                case 40: // down arrow key
+                    value = value - 1; // No need to check against min, this is done by the Slider anyway
+                    break;
+            }
+            self.shiftLayer(value);
+        };
+
         self.changeCommandRange = function(event) {
             if (self.currentlyPrinting && self.renderer_syncProgress()) self.renderer_syncProgress(false);
 
@@ -516,6 +551,38 @@ $(function() {
 
         self.onTabChange = function(current, previous) {
             self.tabActive = current == "#gcode";
+        };
+
+        self.shiftLayer = function(value){
+            if (value != self.currentLayer) {
+                event.preventDefault();
+
+                self.layerSlider.slider('setValue', value);
+                value = self.layerSlider.slider('getValue');
+                //This sets the scroll bar to the appropriate position.
+                self.layerSlider
+                    .trigger({
+                        type: 'slideStart',
+                        value: value
+                    })
+                    .trigger({
+                        type: 'slide',
+                        value: value
+                    }).trigger({
+                        type: 'slideStop',
+                        value: value
+                    });
+            }
+        };
+
+        self.incrementLayer = function() {
+            var value = self.layerSlider.slider('getValue') + 1;
+            self.shiftLayer(value);
+        };
+
+        self.decrementLayer = function() {
+            var value = self.layerSlider.slider('getValue') - 1;
+            self.shiftLayer(value);
         };
     }
 

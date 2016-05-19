@@ -32,7 +32,8 @@ class SoftwareUpdatePlugin(octoprint.plugin.BlueprintPlugin,
                            octoprint.plugin.SettingsPlugin,
                            octoprint.plugin.AssetPlugin,
                            octoprint.plugin.TemplatePlugin,
-                           octoprint.plugin.StartupPlugin):
+                           octoprint.plugin.StartupPlugin,
+                           octoprint.plugin.WizardPlugin):
 	def __init__(self):
 		self._update_in_progress = False
 		self._configured_checks_mutex = threading.Lock()
@@ -177,12 +178,7 @@ class SoftwareUpdatePlugin(octoprint.plugin.BlueprintPlugin,
 
 		checks = self._get_configured_checks()
 		if "octoprint" in checks:
-			if "checkout_folder" in checks["octoprint"]:
-				data["octoprint_checkout_folder"] = checks["octoprint"]["checkout_folder"]
-			elif "update_folder" in checks["octoprint"]:
-				data["octoprint_checkout_folder"] = checks["octoprint"]["update_folder"]
-			else:
-				data["octoprint_checkout_folder"] = None
+			data["octoprint_checkout_folder"] = self._get_octoprint_checkout_folder(checks=checks)
 			data["octoprint_type"] = checks["octoprint"].get("type", None)
 		else:
 			data["octoprint_checkout_folder"] = None
@@ -220,15 +216,25 @@ class SoftwareUpdatePlugin(octoprint.plugin.BlueprintPlugin,
 			))
 		)
 
+		updated_octoprint_check_config = False
+
 		if "octoprint_checkout_folder" in data:
 			self._settings.set(["checks", "octoprint", "checkout_folder"], data["octoprint_checkout_folder"], defaults=defaults, force=True)
 			if update_folder and data["octoprint_checkout_folder"]:
 				self._settings.set(["checks", "octoprint", "update_folder"], None, defaults=defaults, force=True)
-			self._refresh_configured_checks = True
+			updated_octoprint_check_config = True
 
 		if "octoprint_type" in data and data["octoprint_type"] in ("github_release", "git_commit"):
 			self._settings.set(["checks", "octoprint", "type"], data["octoprint_type"], defaults=defaults, force=True)
+			updated_octoprint_check_config = True
+
+		if updated_octoprint_check_config:
 			self._refresh_configured_checks = True
+			try:
+				del self._version_cache["octoprint"]
+			except KeyError:
+				pass
+			self._version_cache_dirty = True
 
 	def get_settings_version(self):
 		return 4
@@ -409,6 +415,14 @@ class SoftwareUpdatePlugin(octoprint.plugin.BlueprintPlugin,
 		return [
 			dict(type="settings", name=gettext("Software Update"))
 		]
+
+	##~~ WizardPlugin API
+
+	def is_wizard_required(self):
+		checks = self._get_configured_checks()
+		check = checks.get("octoprint", None)
+		checkout_folder = self._get_octoprint_checkout_folder(checks=checks)
+		return check and "update_script" in check and not checkout_folder
 
 	#~~ Updater
 
@@ -779,6 +793,20 @@ class SoftwareUpdatePlugin(octoprint.plugin.BlueprintPlugin,
 			return updaters.python_updater
 		else:
 			raise exceptions.UnknownUpdateType()
+
+	def _get_octoprint_checkout_folder(self, checks=None):
+		if checks is None:
+			checks = self._get_configured_checks()
+
+		if not "octoprint" in checks:
+			return None
+
+		if "checkout_folder" in checks["octoprint"]:
+			return checks["octoprint"]["checkout_folder"]
+		elif "update_folder" in checks["octoprint"]:
+			return checks["octoprint"]["update_folder"]
+
+		return None
 
 
 __plugin_name__ = "Software Update"

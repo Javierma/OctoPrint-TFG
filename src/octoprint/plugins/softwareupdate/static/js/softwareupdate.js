@@ -11,8 +11,23 @@
     var checkUrl = url + "check";
     var updateUrl = url + "update";
 
+    exports.checkEntries = function(entries, force, opts) {
+        entries = entries || [];
+        if (typeof entries == "string") {
+            entries = [entries];
+        }
+
+        var data = {
+            force: !!force
+        };
+        if (entries && entries.length) {
+            data["check"] = entries.join(",")
+        }
+        return OctoPrint.getWithQuery(checkUrl, data, opts);
+    };
+
     exports.check = function(force, opts) {
-        return OctoPrint.get(checkUrl + ((!!force) ? "?force=true" : ""), opts);
+        return exports.checkEntries([], force, opts);
     };
 
     exports.update = function(entries, force, opts) {
@@ -98,7 +113,7 @@ $(function() {
             5
         );
 
-        self.availableAndPossible = ko.computed(function() {
+        self.availableAndPossible = ko.pureComputed(function() {
             return _.filter(self.versions.items(), function(info) { return info.updateAvailable && info.updatePossible; });
         });
 
@@ -167,6 +182,11 @@ $(function() {
             self.config_cacheTtl(self.settings.settings.plugins.softwareupdate.cache_ttl());
             self.config_checkoutFolder(self.settings.settings.plugins.softwareupdate.octoprint_checkout_folder());
             self.config_checkType(self.settings.settings.plugins.softwareupdate.octoprint_type());
+        };
+
+        self._copyConfigBack = function() {
+            self.settings.settings.plugins.softwareupdate.octoprint_checkout_folder(self.config_checkoutFolder());
+            self.settings.settings.plugins.softwareupdate.octoprint_type(self.config_checkType());
         };
 
         self.fromCheckResponse = function(data, ignoreSeen, showIfNothingNew) {
@@ -415,6 +435,23 @@ $(function() {
             self.workingOutput.scrollTop(self.workingOutput[0].scrollHeight - self.workingOutput.height());
         };
 
+        self.onWizardTabChange = function(current, next) {
+            if (next && _.startsWith(next, "wizard_plugin_softwareupdate")) {
+                // switching to the plugin wizard tab
+                self._copyConfig();
+            } else if (current && _.startsWith(current, "wizard_plugin_softwareupdate")) {
+                // switching away from the plugin wizard tab
+                self._copyConfigBack();
+            }
+
+            return true;
+        };
+
+        self.onAfterWizardFinish = function() {
+            // we might have changed our config, so we need to refresh our check data from the server
+            self.performCheck();
+        };
+
         self.onStartup = function() {
             self.workingDialog = $("#settings_plugin_softwareupdate_workingdialog");
             self.workingOutput = $("#settings_plugin_softwareupdate_workingdialog_output");
@@ -616,6 +653,6 @@ $(function() {
     ADDITIONAL_VIEWMODELS.push([
         SoftwareUpdateViewModel,
         ["loginStateViewModel", "printerStateViewModel", "settingsViewModel"],
-        ["#settings_plugin_softwareupdate", "#softwareupdate_confirmation_dialog"]
+        ["#settings_plugin_softwareupdate", "#softwareupdate_confirmation_dialog", "#wizard_plugin_softwareupdate"]
     ]);
 });

@@ -112,14 +112,15 @@ def load_user(id):
 #~~ startup code
 
 
-class Server():
-	def __init__(self, settings=None, plugin_manager=None, host="0.0.0.0", port=5000, debug=False, allow_root=False):
+class Server(object):
+	def __init__(self, settings=None, plugin_manager=None, host="0.0.0.0", port=5000, debug=False, allow_root=False, octoprint_daemon=None):
 		self._settings = settings
 		self._plugin_manager = plugin_manager
 		self._host = host
 		self._port = port
 		self._debug = debug
 		self._allow_root = allow_root
+		self._octoprint_daemon = octoprint_daemon
 		self._server = None
 
 		self._logger = None
@@ -290,7 +291,7 @@ class Server():
 		self._setup_assets()
 
 		# configure timelapse
-		octoprint.timelapse.configureTimelapse()
+		octoprint.timelapse.configure_timelapse()
 
 		# setup command triggers
 		events.CommandTrigger(printer)
@@ -366,7 +367,8 @@ class Server():
 
 		server_routes = self._router.urls + [
 			# various downloads
-			(r"/downloads/timelapse/([^/]*\.mpg)", util.tornado.LargeResponseHandler, joined_dict(dict(path=self._settings.getBaseFolder("timelapse")),
+			# .mpg and .mp4 timelapses:
+			(r"/downloads/timelapse/([^/]*\.mp[g4])", util.tornado.LargeResponseHandler, joined_dict(dict(path=self._settings.getBaseFolder("timelapse")),
 			                                                                                      download_handler_kwargs,
 			                                                                                      no_hidden_files_validator)),
 			(r"/downloads/files/local/(.*)", util.tornado.LargeResponseHandler, joined_dict(dict(path=self._settings.getBaseFolder("uploads")),
@@ -514,6 +516,11 @@ class Server():
 			octoprint.plugin.call_plugin(octoprint.plugin.ShutdownPlugin,
 			                             "on_shutdown",
 			                             sorting_context="ShutdownPlugin.on_shutdown")
+
+			if self._octoprint_daemon is not None:
+				self._logger.info("Cleaning up daemon pidfile")
+				self._octoprint_daemon.terminated()
+
 			self._logger.info("Goodbye!")
 		atexit.register(on_shutdown)
 
@@ -640,6 +647,52 @@ class Server():
 		app.jinja_env.filters["offset_html_headers"] = offset_html_headers
 		app.jinja_env.filters["offset_markdown_headers"] = offset_markdown_headers
 
+		def regex_replace(s, find, replace):
+			return re.sub(find, replace, s)
+
+		html_header_regex = re.compile("<h(?P<number>[1-6])>(?P<content>.*?)</h(?P=number)>")
+		def offset_html_headers(s, offset):
+			def repl(match):
+				number = int(match.group("number"))
+				number += offset
+				if number > 6:
+					number = 6
+				elif number < 1:
+					number = 1
+				return "<h{number}>{content}</h{number}>".format(number=number, content=match.group("content"))
+			return html_header_regex.sub(repl, s)
+
+		markdown_header_regex = re.compile("^(?P<hashs>#+)\s+(?P<content>.*)$", flags=re.MULTILINE)
+		def offset_markdown_headers(s, offset):
+			def repl(match):
+				number = len(match.group("hashs"))
+				number += offset
+				if number > 6:
+					number = 6
+				elif number < 1:
+					number = 1
+				return "{hashs} {content}".format(hashs="#" * number, content=match.group("content"))
+			return markdown_header_regex.sub(repl, s)
+
+		html_link_regex = re.compile("<(?P<tag>a.*?)>(?P<content>.*?)</a>")
+		def externalize_links(text):
+			def repl(match):
+				tag = match.group("tag")
+				if not u"href" in tag:
+					return match.group(0)
+
+				if not u"target=" in tag and not u"rel=" in tag:
+					tag += u" target=\"_blank\" rel=\"noreferrer noopener\""
+
+				content = match.group("content")
+				return u"<{tag}>{content}</a>".format(tag=tag, content=content)
+			return html_link_regex.sub(repl, text)
+
+		app.jinja_env.filters["regex_replace"] = regex_replace
+		app.jinja_env.filters["offset_html_headers"] = offset_html_headers
+		app.jinja_env.filters["offset_markdown_headers"] = offset_markdown_headers
+		app.jinja_env.filters["externalize_links"] = externalize_links
+
 		# configure additional template folders for jinja2
 		import jinja2
 		import octoprint.util.jinja
@@ -650,7 +703,7 @@ class Server():
 		loaders = [app.jinja_loader, filesystem_loader]
 		if octoprint.util.is_running_from_source():
 			root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
-			allowed = ["AUTHORS.md", "CHANGELOG.md", "THIRDPARTYLICENSES.md"]
+			allowed = ["AUTHORS.md", "CHANGELOG.md", "SUPPORTERS.md", "THIRDPARTYLICENSES.md"]
 			files = {"_data/" + name: os.path.join(root, name) for name in allowed}
 			loaders.append(octoprint.util.jinja.SelectedFilesLoader(files))
 
@@ -880,7 +933,7 @@ class Server():
 			"js/lib/modernizr.custom.js",
 			"js/lib/lodash.min.js",
 			"js/lib/sprintf.min.js",
-			"js/lib/knockout.js",
+			"js/lib/knockout-3.4.0.js",
 			"js/lib/knockout.mapping-latest.js",
 			"js/lib/babel.js",
 			"js/lib/avltree.js",

@@ -5,12 +5,13 @@ $(function() {
         self.loginState = parameters[0];
         self.users = parameters[1];
         self.printerProfiles = parameters[2];
+        self.about = parameters[3];
 
         self.allViewModels = [];
 
         self.receiving = ko.observable(false);
         self.sending = ko.observable(false);
-        self.exchanging = ko.computed(function() {
+        self.exchanging = ko.pureComputed(function() {
             return self.receiving() || self.sending();
         });
         self.outstanding = [];
@@ -22,11 +23,11 @@ $(function() {
         self.translationUploadButton = $("#settings_appearance_managelanguagesdialog_upload_start");
 
         self.translationUploadFilename = ko.observable();
-        self.invalidTranslationArchive = ko.computed(function() {
+        self.invalidTranslationArchive = ko.pureComputed(function() {
             var name = self.translationUploadFilename();
             return name !== undefined && !(_.endsWith(name.toLocaleLowerCase(), ".zip") || _.endsWith(name.toLocaleLowerCase(), ".tar.gz") || _.endsWith(name.toLocaleLowerCase(), ".tgz") || _.endsWith(name.toLocaleLowerCase(), ".tar"));
         });
-        self.enableTranslationUpload = ko.computed(function() {
+        self.enableTranslationUpload = ko.pureComputed(function() {
             var name = self.translationUploadFilename();
             return name !== undefined && name.trim() != "" && !self.invalidTranslationArchive();
         });
@@ -100,6 +101,7 @@ $(function() {
         self.appearance_color = ko.observable(undefined);
         self.appearance_colorTransparent = ko.observable();
         self.appearance_defaultLanguage = ko.observable();
+        self.appearance_showFahrenheitAlso = ko.observable(undefined);
 
         self.printer_defaultExtrusionLength = ko.observable(undefined);
 
@@ -114,6 +116,10 @@ $(function() {
         self.webcam_rotate90 = ko.observable(undefined);
 
         self.feature_gcodeViewer = ko.observable(undefined);
+        self.feature_sizeThreshold = ko.observable();
+        self.feature_mobileSizeThreshold = ko.observable();
+        self.feature_sizeThreshold_str = sizeObservable(self.feature_sizeThreshold);
+        self.feature_mobileSizeThreshold_str = sizeObservable(self.feature_mobileSizeThreshold);
         self.feature_temperatureGraph = ko.observable(undefined);
         self.feature_waitForStart = ko.observable(undefined);
         self.feature_sendChecksum = ko.observable("print");
@@ -143,6 +149,10 @@ $(function() {
         self.serial_longRunningCommands = ko.observable(undefined);
         self.serial_checksumRequiringCommands = ko.observable(undefined);
         self.serial_helloCommand = ko.observable(undefined);
+        self.serial_ignoreErrorsFromFirmware = ko.observable(undefined);
+        self.serial_disconnectOnErrors = ko.observable(undefined);
+        self.serial_triggerOkForM29 = ko.observable(undefined);
+        self.serial_supportResendsWithoutOk = ko.observable(undefined);
 
         self.folder_uploads = ko.observable(undefined);
         self.folder_timelapse = ko.observable(undefined);
@@ -521,7 +531,7 @@ $(function() {
             return item.display + ((item.english != undefined) ? ' (' + item.english + ')' : '');
         };
 
-        self.languagePacksAvailable = ko.computed(function() {
+        self.languagePacksAvailable = ko.pureComputed(function() {
             return self.translations.allSize() > 0;
         });
 
@@ -795,7 +805,7 @@ $(function() {
 
     OCTOPRINT_VIEWMODELS.push([
         SettingsViewModel,
-        ["loginStateViewModel", "usersViewModel", "printerProfilesViewModel"],
+        ["loginStateViewModel", "usersViewModel", "printerProfilesViewModel", "aboutViewModel"],
         ["#settings_dialog", "#navbar_settings"]
     ]);
 });

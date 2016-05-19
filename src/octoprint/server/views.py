@@ -17,6 +17,7 @@ from octoprint.server import app, userManager, pluginManager, gettext, \
 	debug, LOCALES, VERSION, DISPLAY_VERSION, UI_API_KEY, BRANCH, preemptiveCache, \
 	NOT_MODIFIED
 from octoprint.settings import settings
+from octoprint.filemanager import get_all_extensions
 
 import re
 
@@ -50,7 +51,7 @@ def index():
 	now = datetime.datetime.utcnow()
 	render_kwargs = _get_render_kwargs(_templates, _plugin_names, _plugin_vars, now)
 
-	def get_preemptively_cached_view(key, view, data=None, additional_request_data=None):
+	def get_preemptively_cached_view(key, view, data=None, additional_request_data=None, additional_unless=None):
 		if (data is None and additional_request_data is None) or g.locale is None:
 			return view
 
@@ -84,10 +85,17 @@ def index():
 			except:
 				_logger.exception("Error retrieving additional data for preemptive cache from plugin {}".format(key))
 
+		def unless():
+			disabled_for_root = request.url_root in settings().get(["server", "preemptiveCache", "exceptions"])
+			if callable(additional_unless):
+				return disabled_for_root or additional_unless()
+			else:
+				return disabled_for_root
+
 		# finally decorate our view
 		return util.flask.preemptively_cached(cache=preemptiveCache,
 		                                      data=d,
-		                                      unless=lambda: request.url_root in settings().get(["server", "preemptiveCache", "exceptions"]))(view)
+		                                      unless=unless)(view)
 
 	def get_cached_view(key, view, additional_key_data=None, additional_files=None, custom_files=None, custom_etag=None, custom_lastmodified=None):
 		def cache_key():
@@ -205,7 +213,8 @@ def index():
 			preemptively_cached = get_preemptively_cached_view(plugin._identifier,
 			                                                   cached,
 			                                                   plugin.get_ui_data_for_preemptive_caching,
-			                                                   plugin.get_ui_additional_request_data_for_preemptive_caching)
+			                                                   plugin.get_ui_additional_request_data_for_preemptive_caching,
+			                                                   plugin.get_ui_additional_unless)
 
 			response = preemptively_cached(now, request, render_kwargs)
 			if response is not None:
@@ -249,6 +258,7 @@ def _get_render_kwargs(templates, plugin_names, plugin_vars, now):
 
 	first_run = settings().getBoolean(["server", "firstRun"])
 	locales = dict((l.language, dict(language=l.language, display=l.display_name, english=l.english_name)) for l in LOCALES)
+	extensions = map(lambda ext: ".{}".format(ext), get_all_extensions())
 
 	#~~ prepare full set of template vars for rendering
 
@@ -260,6 +270,7 @@ def _get_render_kwargs(templates, plugin_names, plugin_vars, now):
 		templates=templates,
 		pluginNames=plugin_names,
 		locales=locales,
+		supportedExtensions=extensions
 	)
 	render_kwargs.update(plugin_vars)
 
@@ -354,7 +365,7 @@ def _process_templates():
 	# sidebar
 
 	templates["sidebar"]["entries"]= dict(
-		connection=(gettext("Connection"), dict(template="sidebar/connection.jinja2", _div="connection", icon="signal", styles_wrapper=["display: none"], data_bind="visible: loginState.isAdmin")),
+		connection=(gettext("Connection"), dict(template="sidebar/connection.jinja2", _div="connection", icon="signal", styles_wrapper=["display: none"], data_bind="visible: loginState.isUser")),
 		state=(gettext("State"), dict(template="sidebar/state.jinja2", _div="state", icon="info-sign")),
 		files=(gettext("Files"), dict(template="sidebar/files.jinja2", _div="files", icon="list", classes_content=["overflow_visible"], template_header="sidebar/files_header.jinja2"))
 	)
@@ -386,6 +397,7 @@ def _process_templates():
 
 		features=(gettext("Features"), dict(template="dialogs/settings/features.jinja2", _div="settings_features", custom_bindings=False)),
 		webcam=(gettext("Webcam & Timelapse"), dict(template="dialogs/settings/webcam.jinja2", _div="settings_webcam", custom_bindings=False)),
+		gcodevisualizer=(gettext("GCODE Visualizer"), dict(template="dialogs/settings/gcodevisualizer.jinja2", _div="settings_gcodegcodevisualizer", custom_bindings=False)),
 		api=(gettext("API"), dict(template="dialogs/settings/api.jinja2", _div="settings_api", custom_bindings=False)),
 
 		section_octoprint=(gettext("OctoPrint"), None),
@@ -426,11 +438,12 @@ def _process_templates():
 	# about dialog
 
 	templates["about"]["entries"] = dict(
-		about=(gettext("About OctoPrint"), dict(template="dialogs/about/about.jinja2", _div="about_about", custom_bindings=False)),
-		license=(gettext("OctoPrint License"), dict(template="dialogs/about/license.jinja2", _div="about_license", custom_bindings=False)),
-		thirdparty=(gettext("Third Party Licenses"), dict(template="dialogs/about/thirdparty.jinja2", _div="about_thirdparty", custom_bindings=False)),
-		authors=(gettext("Authors"), dict(template="dialogs/about/authors.jinja2", _div="about_authors", custom_bindings=False)),
-		changelog=(gettext("Changelog"), dict(template="dialogs/about/changelog.jinja2", _div="about_changelog", custom_bindings=False))
+		about=("About OctoPrint", dict(template="dialogs/about/about.jinja2", _div="about_about", custom_bindings=False)),
+		license=("OctoPrint License", dict(template="dialogs/about/license.jinja2", _div="about_license", custom_bindings=False)),
+		thirdparty=("Third Party Licenses", dict(template="dialogs/about/thirdparty.jinja2", _div="about_thirdparty", custom_bindings=False)),
+		authors=("Authors", dict(template="dialogs/about/authors.jinja2", _div="about_authors", custom_bindings=False)),
+		changelog=("Changelog", dict(template="dialogs/about/changelog.jinja2", _div="about_changelog", custom_bindings=False)),
+		supporters=("Supporters", dict(template="dialogs/about/supporters.jinja2", _div="about_sponsors", custom_bindings=False))
 	)
 
 	# extract data from template plugins

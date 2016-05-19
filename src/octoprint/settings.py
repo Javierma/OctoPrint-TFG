@@ -46,7 +46,7 @@ def settings(init=False, basedir=None, configfile=None):
 	        (False, default). If this is set to True and the plugin manager has already been initialized, a :class:`ValueError`
 	        will be raised. The same will happen if the plugin manager has not yet been initialized and this is set to
 	        False.
-	    basedir (str): Path of the base directoy for all of OctoPrint's settings, log files, uploads etc. If not set
+	    basedir (str): Path of the base directory for all of OctoPrint's settings, log files, uploads etc. If not set
 	        the default will be used: ``~/.octoprint`` on Linux, ``%APPDATA%/OctoPrint`` on Windows and
 	        ``~/Library/Application Support/OctoPrint`` on MacOS.
 	    configfile (str): Path of the configuration file (``config.yaml``) to work on. If not set the default will
@@ -90,6 +90,13 @@ default_settings = {
 		"longRunningCommands": ["G4", "G28", "G29", "G30", "G32", "M400", "M226"],
 		"checksumRequiringCommands": ["M110"],
 		"helloCommand": "M110 N0",
+		"disconnectOnErrors": True,
+		"ignoreErrorsFromFirmware": False,
+		"logResends": True,
+		"supportResendsWithoutOk": False,
+
+		# command specific flags
+		"triggerOkForM29": True
 	},
 	"server": {
 		"host": "0.0.0.0",
@@ -140,7 +147,8 @@ default_settings = {
 			"options": {},
 			"postRoll": 0,
 			"fps": 25
-		}
+		},
+		"cleanTmpAfterDays": 7
 	},
 	"gcodeViewer": {
 		"enabled": True,
@@ -204,19 +212,20 @@ default_settings = {
 		"color": "default",
 		"colorTransparent": False,
 		"defaultLanguage": "_default",
+		"showFahrenheitAlso": False,
 		"components": {
 			"order": {
-				"navbar": ["settings", "systemmenu", "login"],
+				"navbar": ["settings", "systemmenu", "login", "plugin_announcements"],
 				"sidebar": ["connection", "state", "files"],
 				"tab": ["temperature", "control", "gcodeviewer", "terminal", "timelapse"],
 				"settings": [
 					"section_printer", "serial", "printerprofiles", "temperatures", "terminalfilters", "gcodescripts",
-					"section_features", "features", "webcam", "accesscontrol", "api",
-					"section_octoprint", "server", "folders", "appearance", "logs", "plugin_pluginmanager", "plugin_softwareupdate"
+					"section_features", "features", "webcam", "accesscontrol", "gcodevisualizer", "api",
+					"section_octoprint", "server", "folders", "appearance", "logs", "plugin_pluginmanager", "plugin_softwareupdate", "plugin_announcements"
 				],
 				"usersettings": ["access", "interface"],
 				"wizard": ["access"],
-				"about": ["about", "license", "thirdparty", "plugin_pluginmanager", "authors", "changelog"],
+				"about": ["about", "supporters", "authors", "changelog", "license", "thirdparty", "plugin_pluginmanager"],
 				"generic": []
 			},
 			"disabled": {
@@ -312,6 +321,7 @@ default_settings = {
 			"waitInterval": 1.0,
 			"supportM112": True,
 			"echoOnM117": True,
+			"brokenM29": True,
 			"supportF": False
 		}
 	}

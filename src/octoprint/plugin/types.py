@@ -109,9 +109,9 @@ class StartupPlugin(OctoPrintPlugin, SortablePlugin):
 	The ``StartupPlugin`` allows hooking into the startup of OctoPrint. It can be used to start up additional services
 	on or just after the startup of the server.
 
-	``StartupPlugin`` is a :class:`~octoprint.plugin.core.SortablePlugin`. The
-	relevant sorting context for :meth:`on_startup` is ``StartupPlugin.on_startup``,
-	the one for :meth:`on_after_startup` will be ``StartupPlugin.on_after_startup``.
+	``StartupPlugin`` is a :class:`~octoprint.plugin.core.SortablePlugin` and provides
+	sorting contexts for :meth:`~octoprint.plugin.StartupPlugin.on_startup` as well as
+	:meth:`~octoprint.plugin.StartupPlugin.on_after_startup`.
 	"""
 
 	def on_startup(self, host, port):
@@ -122,6 +122,8 @@ class StartupPlugin(OctoPrintPlugin, SortablePlugin):
 		is not actually up yet and none of your plugin's APIs or blueprints will be reachable yet. If you need to be
 		externally reachable, use :func:`on_after_startup` instead or additionally.
 
+		The relevant sorting context is ``StartupPlugin.on_startup``.
+
 		:param string host: the host the server will listen on, may be ``0.0.0.0``
 		:param int port:    the port the server will listen on
 		"""
@@ -131,6 +133,8 @@ class StartupPlugin(OctoPrintPlugin, SortablePlugin):
 	def on_after_startup(self):
 		"""
 		Called just after launch of the server, so when the listen loop is actually running already.
+
+		The relevant sorting context is ``StartupPlugin.on_after_startup``.
 		"""
 
 		pass
@@ -142,20 +146,22 @@ class ShutdownPlugin(OctoPrintPlugin, SortablePlugin):
 	:class:`StartupPlugin` mixin, to cleanly shut down additional services again that where started by the :class:`StartupPlugin`
 	part of the plugin.
 
-	``ShutdownPlugin`` is a :class:`~octoprint.plugin.core.SortablePlugin`.
-	The relevant sorting context will be ``ShutdownPlugin.on_shutdown``.
+	``ShutdownPlugin`` is a :class:`~octoprint.plugin.core.SortablePlugin` and provides a sorting context for
+	:meth:`~octoprint.plugin.ShutdownPlugin.on_shutdown`.
 	"""
 
 	def on_shutdown(self):
 		"""
 		Called upon the imminent shutdown of OctoPrint.
+
+		The relevant sorting context is ``ShutdownPlugin.on_shutdown``.
 		"""
 		pass
 
 
 class AssetPlugin(OctoPrintPlugin, RestartNeedingPlugin):
 	"""
-	The ``AssetPlugin`` mixin allows plugins to define additional static assets such as Javascript or CSS files to
+	The ``AssetPlugin`` mixin allows plugins to define additional static assets such as JavaScript or CSS files to
 	be automatically embedded into the pages delivered by the server to be used within the client sided part of
 	the plugin.
 
@@ -181,7 +187,7 @@ class AssetPlugin(OctoPrintPlugin, RestartNeedingPlugin):
 		imported at the appropriate places to be available:
 
 		js
-		   Javascript files, such as additional view models
+		   JavaScript files, such as additional view models
 		css
 		   CSS files with additional styles, will be embedded into delivered pages when not running in LESS mode.
 		less
@@ -289,7 +295,7 @@ class TemplatePlugin(OctoPrintPlugin, ReloadNeedingPlugin):
 
 	Generic
 	   Plugins may also inject arbitrary templates into the page of the web interface itself, e.g. in order to
-	   add overlays or dialogs to be called from within the plugin's javascript code.
+	   add overlays or dialogs to be called from within the plugin's JavaScript code.
 
 	.. figure:: ../images/template-plugin-types-main.png
 	   :align: center
@@ -467,8 +473,8 @@ class TemplatePlugin(OctoPrintPlugin, ReloadNeedingPlugin):
 		      ]
 
 		   This will only include the tab defined in ``myplugin_othertab.jinja2`` though, ``myplugin_tab.jinja2`` will
-		   not be included automatically since the presence of a defintion for the ``tab`` type overrides the automatic
-		   injection of the default template. You'll have to include it explicitely:
+		   not be included automatically since the presence of a definition for the ``tab`` type overrides the automatic
+		   injection of the default template. You'll have to include it explicitly:
 
 		   .. code-block:: python
 
@@ -523,9 +529,9 @@ class UiPlugin(OctoPrintPlugin, SortablePlugin):
 	response altogether, a plugin may set no-cache headers on the returned
 	response as well.
 
-	``UiPlugin`` is a :class:`~octoprint.plugin.core.SortablePlugin`. The
-	relevant sorting context when acting as a UiPlugin is ``UiPlugin.will_handle_ui``.
-	The first plugin to return ``True`` will be the one whose ui will be used,
+	``UiPlugin`` is a :class:`~octoprint.plugin.core.SortablePlugin` with a sorting context
+	for :meth:`~octoprint.plugin.UiPlugin.will_handle_ui`. The first plugin to return ``True``
+	for :meth:`~octoprint.plugin.UiPlugin.will_handle_ui` will be the one whose ui will be used,
 	no further calls to :meth:`~octoprint.plugin.UiPlugin.on_ui_render` will be performed.
 
 	If implementations want to serve custom templates in the :meth:`~octoprint.plugin.UiPlugin.on_ui_render`
@@ -554,6 +560,20 @@ class UiPlugin(OctoPrintPlugin, SortablePlugin):
 	you should still see the default UI. However if you access it from a mobile
 	device (make sure to not have that request the desktop version of pages!)
 	you should see the very simple dummy page defined above.
+
+	**Preemptive and Runtime Caching**
+
+	OctoPrint will also cache your custom UI for your in its server side UI cache, making sure
+	it only gets re-rendered if the request demands that (by having no-cache headers set) or if
+	the cache gets invalidated otherwise.
+
+	In order to be able to do that, the ``UiPlugin`` offers overriding a couple of cache specific
+	methods used for figuring out the source files whose modification time to use for cache invalidation
+	as well as override possibilities for ETag and LastModified calculation. Additionally there are
+	methods to allow persisting call parameters to allow for preemptively caching your UI during
+	server startup (basically eager caching instead of lazily waiting for the first request).
+
+	See below for details on this.
 	"""
 
 	def will_handle_ui(self, request):
@@ -564,6 +584,9 @@ class UiPlugin(OctoPrintPlugin, SortablePlugin):
 		Return ``True`` here to signal that your implementation will handle
 		the request and that the result of its :meth:`~octoprint.plugin.UiPlugin.on_ui_render` method
 		is what should be served to the user.
+
+		The execution order of calls to this method can be influenced via the sorting context
+		``UiPlugin.will_handle_ui``.
 
 		Arguments:
 		    request (flask.Request): A Flask `Request <http://flask.pocoo.org/docs/0.10/api/#flask.Request>`_
@@ -640,6 +663,8 @@ class UiPlugin(OctoPrintPlugin, SortablePlugin):
 		       value.
 		   * - locales
 		     - The locales for which there are translations available.
+		   * - supportedExtensions
+		     - The file extensions supported for uploads.
 
 		On top of that all additional template variables as provided by :meth:`~octoprint.plugin.TemplatePlugin.get_template_vars`
 		will be contained in the dictionary as well.
@@ -662,25 +687,86 @@ class UiPlugin(OctoPrintPlugin, SortablePlugin):
 		return None
 
 	def get_ui_additional_key_data_for_cache(self):
+		"""
+		Allows to return additional data to use in the cache key.
+
+		Returns:
+		    list, tuple: A list or tuple of strings to use in the cache key. Will be joined by OctoPrint
+		        using ``:`` as separator and appended to the existing ``ui:<identifier>:<base url>:<locale>``
+		        cache key. Ignored if ``None`` is returned.
+		"""
 		return None
 
 	def get_ui_additional_tracked_files(self):
+		"""
+		Allows to return additional files to track for validating existing caches. By default OctoPrint
+		will track all declared templates, assets and translation files in the system. Additional
+		files can be added by a plugin through this callback.
+
+		Returns:
+		    list: A list of paths to additional files whose modification to track for (in)validating
+		        the cache. Ignored if ``None`` is returned.
+		"""
 		return None
 
 	def get_ui_custom_tracked_files(self):
+		"""
+		Allows to define a complete separate set of files to track for (in)validating the cache. If this
+		method returns something, the templates, assets and translation files won't be tracked, only the
+		files specified in the returned list.
+
+		Returns:
+		    list: A list of paths representing the only files whose modification to track for (in)validating
+		        the cache. Ignored if ``None`` is returned.
+		"""
 		return None
 
 	def get_ui_custom_etag(self):
+		"""
+		Allows to use a custom way to calculate the ETag, instead of the default method (hashing
+		OctoPrint's version, current ``UI_API_KEY``, tracked file paths and ``LastModified`` value).
+
+		Returns:
+		    basestring: An alternatively calculate ETag value. Ignored if ``None`` is returned.
+		"""
 		return None
 
 	def get_ui_custom_lastmodified(self):
+		"""
+		Allows to calculate the LastModified differently than using the most recent modification
+		date of all tracked files.
+
+		Returns:
+		    int: An alternatively calculated LastModified value. Ignored if ``None`` is returned.
+		"""
 		return None
 
 	def get_ui_data_for_preemptive_caching(self):
+		"""
+		Allows defining additional data to be persisted in the preemptive cache configuration, on
+		top of the request path, base URL and used locale will be persisted.
+
+		Returns:
+		    dict: Additional data to persist in the preemptive cache configuration.
+		"""
 		return None
 
 	def get_ui_additional_request_data_for_preemptive_caching(self):
+		"""
+		Allows defining additional request data to persist in the preemptive cache configuration and
+		to use for the fake request used for populating the preemptive cache.
+
+		Keys and values are used as keyword arguments for creating the `Werkzeug EnvironBuilder <http://werkzeug.pocoo.org/docs/0.11/test/#werkzeug.test.EnvironBuilder>`_
+		used for creating the fake request.
+
+		Returns:
+		    dict: Additional request data to persist in the preemptive cache configuration and to
+		        use for request environment construction.
+		"""
 		return None
+
+	def get_ui_additional_unless(self):
+		return False
 
 class WizardPlugin(OctoPrintPlugin, ReloadNeedingPlugin):
 	"""
@@ -790,14 +876,14 @@ class WizardPlugin(OctoPrintPlugin, ReloadNeedingPlugin):
 		data to perform its task.
 
 		Returns:
-		    dict: a dictionary containig additional data to provide to the frontend. Whatever the plugin
+		    dict: a dictionary containing additional data to provide to the frontend. Whatever the plugin
 		          returns here will be made available on the wizard API under the plugin's identifier
 		"""
 		return dict()
 
 	def on_wizard_finish(self, handled):
 		"""
-		Called by OctoPrint whenever the user finishes a wizard session is finished.
+		Called by OctoPrint whenever the user finishes a wizard session.
 
 		The ``handled`` parameter will indicate whether that plugin's wizard was
 		included in the wizard dialog presented to the user (so the plugin providing
@@ -1536,7 +1622,7 @@ class SlicerPlugin(OctoPrintPlugin):
 		    path (str): The absolute path to which to save the profile.
 		    profile (SlicingProfile): The profile to save.
 		    allow_overwrite (boolean): Whether to allow to overwrite an existing profile at the indicated path (True,
-		        default) or not (False). If a profile already exists on teh path and this is False an
+		        default) or not (False). If a profile already exists on the path and this is False an
 		        :class:`IOError` should be raised.
 		    overrides (dict): Profile overrides to apply to the ``profile`` before saving it
 		"""
@@ -1582,7 +1668,7 @@ class SlicerPlugin(OctoPrintPlugin):
 
 		_analysis
 		    Analysis result of the generated machine code as returned by the slicer itself. This should match the
-		    data structure described for the analysis queue of the matching maching code format, e.g.
+		    data structure described for the analysis queue of the matching machine code format, e.g.
 		    :class:`~octoprint.filemanager.analysis.GcodeAnalysisQueue` for GCODE files.
 
 		For jobs that did not finish successfully (but not due to being cancelled!), ``result`` should be a :class:`str`

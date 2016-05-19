@@ -23,26 +23,26 @@ $(function() {
 
         self.freeSpace = ko.observable(undefined);
         self.totalSpace = ko.observable(undefined);
-        self.freeSpaceString = ko.computed(function() {
+        self.freeSpaceString = ko.pureComputed(function() {
             if (!self.freeSpace())
                 return "-";
             return formatSize(self.freeSpace());
         });
-        self.totalSpaceString = ko.computed(function() {
+        self.totalSpaceString = ko.pureComputed(function() {
             if (!self.totalSpace())
                 return "-";
             return formatSize(self.totalSpace());
         });
 
-        self.diskusageWarning = ko.computed(function() {
+        self.diskusageWarning = ko.pureComputed(function() {
             return self.freeSpace() != undefined
                 && self.freeSpace() < self.settingsViewModel.server_diskspace_warning();
         });
-        self.diskusageCritical = ko.computed(function() {
+        self.diskusageCritical = ko.pureComputed(function() {
             return self.freeSpace() != undefined
                 && self.freeSpace() < self.settingsViewModel.server_diskspace_critical();
         });
-        self.diskusageString = ko.computed(function() {
+        self.diskusageString = ko.pureComputed(function() {
             if (self.diskusageCritical()) {
                 return gettext("Your available free disk space is critically low.");
             } else if (self.diskusageWarning()) {
@@ -143,11 +143,11 @@ $(function() {
             }
         });
 
-        self.isLoadActionPossible = ko.computed(function() {
+        self.isLoadActionPossible = ko.pureComputed(function() {
             return self.loginState.isUser() && !self.isPrinting() && !self.isPaused() && !self.isLoading();
         });
 
-        self.isLoadAndPrintActionPossible = ko.computed(function() {
+        self.isLoadAndPrintActionPossible = ko.pureComputed(function() {
             return self.loginState.isUser() && self.isOperational() && self.isLoadActionPossible();
         });
 
@@ -525,7 +525,12 @@ $(function() {
             self.uploadProgress = $("#gcode_upload_progress");
             self.uploadProgressBar = $(".bar", self.uploadProgress);
 
-            self.localTarget = CONFIG_SD_SUPPORT ? $("#drop_locally") : $("#drop");
+            if (CONFIG_SD_SUPPORT) {
+                self.localTarget = $("#drop_locally");
+            } else {
+                self.localTarget = $("#drop");
+                self.listHelper.removeFilter('sd');
+            }
             self.sdTarget = $("#drop_sd");
 
             function evaluateDropzones() {
@@ -624,8 +629,7 @@ $(function() {
                 self.uploadProgress
                     .removeClass("progress-striped active");
             }
-        }
-
+        };
 
         self._handleUploadDone = function(e, data) {
             var filename = undefined;
@@ -640,7 +644,7 @@ $(function() {
             self.requestData(filename, location, self.currentPath());
 
             if (data.result.done) {
-                selef._setProgressBar(0, "", false);
+                self._setProgressBar(0, "", false);
             }
         };
 
@@ -653,14 +657,14 @@ $(function() {
                 type: "error",
                 hide: false
             });
-            self.setProgressBar(0, "", false);
+            self._setProgressBar(0, "", false);
         };
 
         self._handleUploadProgress = function(e, data) {
             var progress = parseInt(data.loaded / data.total * 100, 10);
             var uploaded = progress >= 100;
 
-            self.setProgressBar(progress, uploaded ? gettext("Saving ...") : gettext("Uploading ..."), uploaded);
+            self._setProgressBar(progress, uploaded ? gettext("Saving ...") : gettext("Uploading ..."), uploaded);
         };
 
         self._handleDragNDrop = function (e) {
@@ -672,17 +676,6 @@ $(function() {
             var dropZoneLocalBackground = $("#drop_locally_background");
             var dropZoneSdBackground = $("#drop_sd_background");
             var timeout = window.dropZoneTimeout;
-
-            var dataTransfer = undefined;
-            if (e.dataTransfer) {
-                dataTransfer = e.dataTransfer;
-            } else if (e.originalEvent && e.originalEvent.dataTransfer) {
-                dataTransfer = e.originalEvent.dataTransfer;
-            }
-
-            if (!dataTransfer || !dataTransfer.items || dataTransfer.items.length > 1 || dataTransfer.items[0].kind != "file") {
-                return;
-            }
 
             if (!timeout) {
                 dropOverlay.addClass('in');

@@ -19,7 +19,7 @@ $(function() {
         self.elementPasswordInput = undefined;
         self.elementLoginButton = undefined;
 
-        self.userMenuText = ko.computed(function() {
+        self.userMenuText = ko.pureComputed(function() {
             if (self.loggedIn()) {
                 return self.username();
             } else {
@@ -87,6 +87,11 @@ $(function() {
                 .done(function(response) {
                     new PNotify({title: gettext("Logout successful"), text: gettext("You are now logged out"), type: "success"});
                     self.fromResponse(response);
+                })
+                .error(function(error) {
+                    if (error && error.status === 401) {
+                         self.fromResponse(false);
+                    }
                 });
         };
 

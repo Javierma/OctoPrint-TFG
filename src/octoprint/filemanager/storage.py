@@ -213,11 +213,11 @@ class StorageInterface(object):
 		  * ``model``: adds a link to a model from which the file was created/sliced, expected additional data is the ``name``
 		    and optionally the ``hash`` of the file to link to. If the link can be resolved against another file on the
 		    current ``path``, not only will it be added to the links of ``name`` but a reverse link of type ``machinecode``
-		    refering to ``name`` and its hash will also be added to the linked ``model`` file
+		    referring to ``name`` and its hash will also be added to the linked ``model`` file
 		  * ``machinecode``: adds a link to a file containing machine code created from the current file (model), expected
 		    additional data is the ``name`` and optionally the ``hash`` of the file to link to. If the link can be resolved
 		    against another file on the current ``path``, not only will it be added to the links of ``name`` but a reverse
-		    link of type ``model`` refering to ``name`` and its hash will also be added to the linked ``model`` file.
+		    link of type ``model`` referring to ``name`` and its hash will also be added to the linked ``model`` file.
 		  * ``web``: adds a location on the web associated with this file (e.g. a website where to download a model),
 		    expected additional data is a ``href`` attribute holding the website's URL and optionally a ``retrieved``
 		    attribute describing when the content was retrieved
@@ -577,8 +577,15 @@ class LocalFileStorage(StorageInterface):
 		# save the file's hash to the metadata of the folder
 		file_hash = self._create_hash(file_path)
 		metadata = self._get_metadata_entry(path, name, default=dict())
+		metadata_dirty = False
 		if not "hash" in metadata or metadata["hash"] != file_hash:
 			metadata["hash"] = file_hash
+			metadata_dirty = True
+		if "analysis" in metadata:
+			del metadata["analysis"]
+			metadata_dirty = True
+
+		if metadata_dirty:
 			self._update_metadata_entry(path, name, metadata)
 
 		# process any links that were also provided for adding to the file
@@ -679,9 +686,6 @@ class LocalFileStorage(StorageInterface):
 			import octoprint.util
 			new_data = octoprint.util.dict_merge(current_data, data)
 			metadata[name][key] = new_data
-			metadata_dirty = True
-		elif key in metadata[name] and overwrite:
-			metadata[name][key] = data
 			metadata_dirty = True
 
 		if metadata_dirty:
