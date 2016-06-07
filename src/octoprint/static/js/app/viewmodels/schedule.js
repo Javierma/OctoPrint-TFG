@@ -5,12 +5,14 @@ $(function() {
         self.loginState = parameters[0];
         self.printerState = parameters[1];
         self.users = parameters[2];
+        self.settings = parameters[3];
 
         self.target = undefined;
         self.file = undefined;
         self.path = undefined;
         self.data = undefined;
 
+        self.showScheduleMenu = ko.observable(false);
         self.day = ko.observable();
         self.month = ko.observable();
         self.year = ko.observable();
@@ -72,8 +74,9 @@ $(function() {
                 path = path || filename.substr(0, filename.lastIndexOf("/"));
                 filename = filename.substr(filename.lastIndexOf("/") + 1);
             }
-            self.requestData();
-            if (self.alreadyScheduled().length > 0) {
+
+            if (self.settings.api_enabled()) {
+                self.requestData();
                 self.alreadyScheduled.removeAll();
                 self.target = target;
                 self.file = file;
@@ -86,6 +89,13 @@ $(function() {
                 self.minute(date.getMinutes());
                 self.title(_.sprintf(gettext("Schedule %(filename)s"), {filename: filename}));
                 $("#schedule_configuration_dialog").modal("show");
+            } else {
+                new PNotify({
+                    title: gettext("API key disabled"),
+                    text: "To be able to schedule jobs, check \'Enable\' in Settings-> FEATURES-> API and make sure that a key has been generated",
+                    type: "error",
+                    hide: false
+                });
             }
         };
 
@@ -429,88 +439,79 @@ $(function() {
         };
 
         self.fromResponse = function(data) {
-            if (data["error"]) {
-                new PNotify({
-                    title: gettext("API key disabled"),
-                    text: data["error"],
-                    type: "error",
-                    hide: false
-                });
-            } else {
             self.data = data;
             _.each(_.values(self.data), function(jobs) {
-                   var hour = Number(jobs.jobStart["hour"]);
-                   var minute = Number(jobs.jobStart["minute"]);
-                   var month = jobs.jobStart["month"];
-                   var day = jobs.jobStart["day_of_month"];
-                   var dayOfWeek = jobs.jobStart["day_of_week"];
-                   var text = undefined;
-                   if (month === '*' && day === '*' && dayOfWeek === '*') {
-                       text = 'Repeat print daily at ' + hour +' : ' + minute;
-                   } else if (month === '*' && day != '*' && dayOfWeek === '*') {
-                       switch (day) {
-                           case '1':
-                               dayText = '1st';
-                               break;
+                var hour = Number(jobs.jobStart["hour"]);
+                var minute = Number(jobs.jobStart["minute"]);
+                var month = jobs.jobStart["month"];
+                var day = jobs.jobStart["day_of_month"];
+                var dayOfWeek = jobs.jobStart["day_of_week"];
+                var text = undefined;
+                if (month === '*' && day === '*' && dayOfWeek === '*') {
+                    text = 'Repeat print daily at ' + hour +' : ' + minute;
+                } else if (month === '*' && day != '*' && dayOfWeek === '*') {
+                    switch (day) {
+                        case '1':
+                            dayText = '1st';
+                            break;
 
-                           case '2':
-                               dayText = '2nd';
-                               break;
+                        case '2':
+                            dayText = '2nd';
+                            break;
 
-                           case '3':
-                               dayText = '3rd';
-                               break;
+                        case '3':
+                            dayText = '3rd';
+                            break;
 
-                           default:
-                                dayText = day +'th';
-                       }
-                       text = 'Repeat print the '+ dayText +' of every month at ' + hour +':' + minute;
-                   } else if (month === '*' && day === '*' && dayOfWeek != '*') {
-                       switch (dayOfWeek) {
-                           case '0':
-                               dayOfWeekText = 'Sunday';
-                               break;
+                        default:
+                            dayText = day +'th';
+                    }
+                    text = 'Repeat print the '+ dayText +' of every month at ' + hour +':' + minute;
+                } else if (month === '*' && day === '*' && dayOfWeek != '*') {
+                    switch (dayOfWeek) {
+                        case '0':
+                            dayOfWeekText = 'Sunday';
+                            break;
 
-                           case '1':
-                               dayOfWeekText = 'Monday';
-                               break;
+                        case '1':
+                            dayOfWeekText = 'Monday';
+                            break;
 
-                           case '2':
-                               dayOfWeekText = 'Tuesday';
-                               break;
+                        case '2':
+                            dayOfWeekText = 'Tuesday';
+                            break;
 
-                           case '3':
-                               dayOfWeekText = 'Wednesday';
-                               break;
+                        case '3':
+                            dayOfWeekText = 'Wednesday';
+                            break;
 
-                           case '4':
-                               dayOfWeekText = 'Thursday';
-                               break;
+                        case '4':
+                            dayOfWeekText = 'Thursday';
+                            break;
 
-                           case '5':
-                               dayOfWeekText = 'Friday';
-                               break;
+                        case '5':
+                            dayOfWeekText = 'Friday';
+                            break;
 
-                           case '6':
-                               dayOfWeekText = 'Saturday';
-                               break;
-                       }
-                       text = 'Print every ' + dayOfWeekText + ' at ' + hour + ':' + minute;
-                   } else {
-                       text = 'Print at ' + day +'/' + month +' ' + hour + ':' + minute;
-                   }
+                        case '6':
+                            dayOfWeekText = 'Saturday';
+                            break;
+                    }
+                    text = 'Print every ' + dayOfWeekText + ' at ' + hour + ':' + minute;
+                } else {
+                    text = 'Print at ' + day +'/' + month +' ' + hour + ':' + minute;
+                }
 
-                   self.alreadyScheduled.push({
-                       filename: jobs.fileName,
-                       day: day,
-                       month: month,
-                       hour: hour,
-                       minute: minute,
-                       dayOfWeek: dayOfWeek,
-                       text : text
-                   })
+                self.alreadyScheduled.push({
+                    filename: jobs.fileName,
+                    day: day,
+                    month: month,
+                    hour: hour,
+                    minute: minute,
+                    dayOfWeek: dayOfWeek,
+                    text : text
+                })
             });
-            }
         };
 
         self.schedule = function() {
@@ -592,14 +593,6 @@ $(function() {
             return name.replace(/[^a-zA-Z0-9\-_\.\(\) ]/g, "").replace(/ /g, "_");
         };
 
-        /*self.onStartup = function() {
-            self.requestData();
-        };
-
-        self.onEventSettingsUpdated = function(payload) {
-            self.requestData();
-        };*/
-
         self.scheduled = ko.computed(function() {
             return _.filter(self.alreadyScheduled(), function(job) {
                 if (self.file === job.filename) {
@@ -612,7 +605,7 @@ $(function() {
 
     OCTOPRINT_VIEWMODELS.push([
         ScheduleViewModel,
-        ["loginStateViewModel", "printerStateViewModel","usersViewModel"],
+        ["loginStateViewModel", "printerStateViewModel","usersViewModel","settingsViewModel"],
         "#schedule_configuration_dialog"
     ]);
 });

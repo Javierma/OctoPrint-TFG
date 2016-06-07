@@ -20,11 +20,6 @@ from crontab import CronTab
 @api.route("/schedule", methods=["GET"])
 @restricted_access
 def getAllScheduledJobs():
-	settings=config.settings()
-	if not settings.get(["api","enabled"]):
-		result = {'error' : 'To be able to schedule jobs, check \'Enable\' in Settings-> FEATURES-> API and make sure that a key has been generated'}
-		return jsonify(result)
-
 	system_cron = CronTab(user=True)
 	result = dict()
 	index = 0
@@ -96,6 +91,7 @@ def programPrint():
 
 	import os, stat
 	path = os.environ["HOME"] + '/.octoprint/.autoprint_pass'
+	settings = config.settings()
 	accessControlEnabled = settings.get(["accessControl","enabled"])
 	if accessControlEnabled:
 		if nameExists is None:
@@ -114,16 +110,15 @@ def programPrint():
 			password = os.read(fd, 128)
 			os.close(fd)
 
-	settings=config.settings()
-	command=None
-	apiKey=None
+	command = None
+	apiKey = None
 
-	port=settings.get(["server","port"])
+	port = settings.get(["server","port"])
 	if port is None:
 		port=5000
 
 	if settings.get(["api","enabled"]):
-		apiKey=settings.get(["api","key"])
+		apiKey = settings.get(["api","key"])
 	if accessControlEnabled:
 		setJob(port, apiKey, json_data, 'autoprint', password)
 		if userCreated:
