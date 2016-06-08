@@ -22,6 +22,18 @@ might be of more interest for you. You might also want to subscribe to [the mail
 or the [G+ Community](https://plus.google.com/communities/102771308349328485741) where there are other active users who might be
 able to help you with any questions you might have.
 
+Installation using printing schedule feature
+--------------------------------------------
+
+In order to also be able to schedule your prints, a checkout of the print_schedule branch must be done before running OctoPrint:
+
+```
+ git checkout printing_schedule
+```
+
+Besides, make sure that the system date is correct by executing the date command. If it is not correctly set, you can consult
+in the [Assorted guides](https://github.com/javierma/OctoPrint-TFG/wiki#assorted-guides)
+
 Contributing
 ------------
 
